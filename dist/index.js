@@ -111,7 +111,7 @@ var CombinedQueryBuilderImpl = /** @class */ (function () {
                     kind: 'SelectionSet',
                     selections: opDefs.flatMap(function (def) { return def.selectionSet.selections; })
                 },
-                variableDefinitions: opDefs.flatMap(function (def) { return def.variableDefinitions || []; }).filter(function (value, index, array) { return array.indexOf(value) === index; })
+                variableDefinitions: opDefs.flatMap(function (def) { return def.variableDefinitions || []; }).filter(function (value, index, array) { var _a, _b; return array.map(function (testValue) { var _a, _b; return (_b = (_a = testValue === null || testValue === void 0 ? void 0 : testValue.variable) === null || _a === void 0 ? void 0 : _a.name) === null || _b === void 0 ? void 0 : _b.value; }).indexOf((_b = (_a = value === null || value === void 0 ? void 0 : value.variable) === null || _a === void 0 ? void 0 : _a.name) === null || _b === void 0 ? void 0 : _b.value) === index; })
             }];
         var encounteredFragmentList = new Set();
         var combinedDocumentDefinitions = this.document.definitions.concat(document.definitions);
