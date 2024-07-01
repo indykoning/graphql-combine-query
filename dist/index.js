@@ -44,13 +44,24 @@ var CombinedQueryError = /** @class */ (function (_super) {
     return CombinedQueryError;
 }(Error));
 var CombinedQueryBuilderImpl = /** @class */ (function () {
-    function CombinedQueryBuilderImpl(operationName, document, variables) {
+    function CombinedQueryBuilderImpl(operationName, document, variables, config) {
         this.operationName = operationName;
         this.document = document;
         this.variables = variables;
+        this.config = this.initializeConfig(config);
     }
-    CombinedQueryBuilderImpl.prototype.add = function (document, variables) {
+    CombinedQueryBuilderImpl.prototype.initializeConfig = function (config) {
+        var _a;
+        if (!config) {
+            config = {};
+        }
+        config = __assign(__assign({}, this.config), config);
+        config.allow_duplicates = (_a = config.allow_duplicates) !== null && _a !== void 0 ? _a : [];
+        return config;
+    };
+    CombinedQueryBuilderImpl.prototype.add = function (document, variables, config) {
         var _this = this;
+        config = this.initializeConfig(config);
         var opDefs = this.document.definitions.concat(document.definitions).filter(function (def) { return def.kind === 'OperationDefinition'; });
         if (!opDefs.length) {
             throw new CombinedQueryError('Expected at least one OperationDefinition, but found none.');
@@ -78,9 +89,9 @@ var CombinedQueryBuilderImpl = /** @class */ (function () {
             // finally all variables must be unique
             (_b = def.variableDefinitions) === null || _b === void 0 ? void 0 : _b.forEach(function (variable) {
                 otherOpDefs.forEach(function (_def) { var _a; return (_a = _def.variableDefinitions) === null || _a === void 0 ? void 0 : _a.forEach(function (_variable) {
-                    var _a, _b;
-                    if (variable.variable.name.value === _variable.variable.name.value) {
-                        throw new CombinedQueryError("duplicate variable definition " + _variable.variable.name.value + " for operations " + ((_a = def.name) === null || _a === void 0 ? void 0 : _a.value) + " and " + ((_b = _def.name) === null || _b === void 0 ? void 0 : _b.value));
+                    var _a, _b, _c;
+                    if (!((_a = config === null || config === void 0 ? void 0 : config.allow_duplicates) === null || _a === void 0 ? void 0 : _a.includes(variable.variable.name.value)) && variable.variable.name.value === _variable.variable.name.value) {
+                        throw new CombinedQueryError("duplicate variable definition " + _variable.variable.name.value + " for operations " + ((_b = def.name) === null || _b === void 0 ? void 0 : _b.value) + " and " + ((_c = _def.name) === null || _c === void 0 ? void 0 : _c.value));
                     }
                 }); });
             });
@@ -137,11 +148,12 @@ var CombinedQueryBuilderImpl = /** @class */ (function () {
     };
     return CombinedQueryBuilderImpl;
 }());
-function combinedQuery(operationName) {
+function combinedQuery(operationName, config) {
+    var defaultConfig = config;
     return {
         operationName: operationName,
-        add: function (document, variables) {
-            return new CombinedQueryBuilderImpl(this.operationName, document, variables);
+        add: function (document, variables, config) {
+            return new CombinedQueryBuilderImpl(this.operationName, document, variables, defaultConfig !== null && defaultConfig !== void 0 ? defaultConfig : config);
         },
         addN: function (document, variables, variableRenameFn, fieldRenameFn) {
             return new CombinedQueryBuilderImpl(this.operationName, emptyDoc).addN(document, variables, variableRenameFn, fieldRenameFn);
