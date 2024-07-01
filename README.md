@@ -121,3 +121,48 @@ mutation CompositeMutation($foo: foo_input!, $bar_id_0: Int!, $bar_0: bar_update
   } 
 */
 ```
+
+## Handling duplicate values 
+
+If you have different queries using the same variables an error will be thrown to protect incorrect data being sent.
+Sometimes you do want this variable to be the same because it is referencing the same data.
+In this case you can use the `allow_duplicates` config option:
+
+```javascript
+import combineQuery from 'graphql-combine-query'
+
+import gql from 'graphql-tag'
+
+const createFooMutation = gql`
+  mutation SetFooOnBar($bar_id: Int!, $foo: String!) {
+    setFooOnBar(where: { id: { _eq: $bar_id } }, setFoo: $foo) {
+      id
+    }
+  }
+`
+
+const updateBarMutation = gql`
+  mutation SetBarOnBar($bar_id: Int!, $bar: String!) {
+    setBarOnBar(where: { id: { _eq: $bar_id } }, setBar: $bar) {
+      id
+    }
+  }
+`
+
+const { document, variables } = (() => combineQuery('CompositeMutation', {allow_duplicates: ['bar_id']})
+  .add(createFooMutation, { bar_id: 1, foo: 'Some foo' })
+  .add(createFooMutation, { bar_id: 1, bar: 'Some bar' })
+)()
+
+console.log(variables)
+/*
+{
+  bar_id: 1,
+  foo: 'Some foo',
+  bar: Some bar'
+}
+
+*/
+```
+
+This config option can be set globally on the `combineQuery`, but can be overridden per `add` call
