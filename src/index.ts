@@ -3,6 +3,10 @@ import { renameVariablesAndTopLevelFields, RenameFnWithIndex, defaultRenameFn, r
 
 type OperationVariables = Record<string, any>
 
+export interface CombinedQueryBuilderConfig {
+  allow_duplicates?: string[],
+}
+
 const emptyDoc: DocumentNode = {
   kind: 'Document',
   definitions: []
@@ -10,14 +14,14 @@ const emptyDoc: DocumentNode = {
 
 export interface NewCombinedQueryBuilder {
   operationName: string,
-  add: <TData = any, TVariables = OperationVariables>(document: DocumentNode, variables?: TVariables) => CombinedQueryBuilder<TData, TVariables>
+  add: <TData = any, TVariables = OperationVariables>(document: DocumentNode, variables?: TVariables, config?: CombinedQueryBuilderConfig) => CombinedQueryBuilder<TData, TVariables>
   addN: <TVariables = OperationVariables>(document: DocumentNode, variables: TVariables[], variableRenameFn?: RenameFnWithIndex, fieldRenameFn?: RenameFnWithIndex ) => CombinedQueryBuilder<{}, {}>
 }
 
 export interface CombinedQueryBuilder<TData = any, TVariables extends OperationVariables = {}> {
   document: DocumentNode,
   variables?: TVariables,
-  add: <TDataAdd = any, TVariablesAdd = OperationVariables>(document: DocumentNode, variables?: TVariablesAdd) => CombinedQueryBuilder<TData & TDataAdd, TVariables & TVariablesAdd>
+  add: <TDataAdd = any, TVariablesAdd = OperationVariables>(document: DocumentNode, variables?: TVariablesAdd, config?: CombinedQueryBuilderConfig) => CombinedQueryBuilder<TData & TDataAdd, TVariables & TVariablesAdd>
   addN: <TVariablesAdd = OperationVariables>(document: DocumentNode, variables: TVariablesAdd[], variableRenameFn?: RenameFnWithIndex, fieldRenameFn?: RenameFnWithIndex) => CombinedQueryBuilder<TData, TVariables>
 }
 
@@ -27,14 +31,28 @@ class CombinedQueryBuilderImpl<TData = any, TVariables = OperationVariables> imp
 
   document: DocumentNode
   variables?: TVariables
+  config?: CombinedQueryBuilderConfig
 
-  constructor(private operationName: string, document: DocumentNode, variables?: TVariables) {
+  constructor(private operationName: string, document: DocumentNode, variables?: TVariables, config?: CombinedQueryBuilderConfig) {
     this.document = document
     this.variables = variables
+    this.config = this.initializeConfig(config)
   }
 
-  add<TDataAdd = any, TVariablesAdd = OperationVariables>(document: DocumentNode, variables?: TVariablesAdd): CombinedQueryBuilder<TData & TDataAdd, TVariables & TVariablesAdd> {
+  initializeConfig(config?: CombinedQueryBuilderConfig): CombinedQueryBuilderConfig
+  {
+    if (!config) {
+      config = {}
+    }
+    config = {...this.config, ...config}
 
+    config.allow_duplicates = config.allow_duplicates ?? [];
+
+    return config;
+  }
+
+  add<TDataAdd = any, TVariablesAdd = OperationVariables>(document: DocumentNode, variables?: TVariablesAdd, config?: CombinedQueryBuilderConfig): CombinedQueryBuilder<TData & TDataAdd, TVariables & TVariablesAdd> {
+    config = this.initializeConfig(config);
     const opDefs = this.document.definitions.concat(document.definitions).filter((def: DefinitionNode): def is OperationDefinitionNode => def.kind === 'OperationDefinition')
     if (!opDefs.length) {
       throw new CombinedQueryError('Expected at least one OperationDefinition, but found none.')
@@ -64,7 +82,7 @@ class CombinedQueryBuilderImpl<TData = any, TVariables = OperationVariables> imp
       // finally all variables must be unique
       def.variableDefinitions?.forEach(variable => {
         otherOpDefs.forEach(_def => _def.variableDefinitions?.forEach(_variable => {
-          if (variable.variable.name.value === _variable.variable.name.value) {
+          if (!config?.allow_duplicates?.includes(variable.variable.name.value) && variable.variable.name.value === _variable.variable.name.value) {
             throw new CombinedQueryError(`duplicate variable definition ${_variable.variable.name.value} for operations ${def.name?.value} and ${_def.name?.value}`)
           }
         }))
@@ -127,11 +145,13 @@ class CombinedQueryBuilderImpl<TData = any, TVariables = OperationVariables> imp
   }
 }
 
-export default function combinedQuery(operationName: string): NewCombinedQueryBuilder {
+export default function combinedQuery(operationName: string, config?: CombinedQueryBuilderConfig): NewCombinedQueryBuilder {
+  let defaultConfig = config;
+  
   return {
     operationName,
-    add<TData = any, TVariables extends OperationVariables={}>(document: DocumentNode, variables?: TVariables ) {
-      return new CombinedQueryBuilderImpl<TData, TVariables>(this.operationName, document, variables)
+    add<TData = any, TVariables extends OperationVariables={}>(document: DocumentNode, variables?: TVariables, config?: CombinedQueryBuilderConfig) {
+      return new CombinedQueryBuilderImpl<TData, TVariables>(this.operationName, document, variables, defaultConfig ?? config)
     },
     addN<TVariables = OperationVariables>(document: DocumentNode, variables: TVariables[], variableRenameFn?: RenameFnWithIndex, fieldRenameFn?: RenameFnWithIndex): CombinedQueryBuilder<{}, {}> {
       return new CombinedQueryBuilderImpl<{}, {}>(this.operationName,  emptyDoc).addN<TVariables>(document, variables, variableRenameFn, fieldRenameFn)

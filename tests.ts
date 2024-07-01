@@ -315,6 +315,28 @@ describe('combinedQuery', () => {
     }).to.throw('duplicate variable definition foo for operations FooQuery and FooQuery2')
   })
 
+  it('validation - allows duplicate variable names that are defined', () => {
+    const fooQuery = parse(`
+      query FooQuery($foo: String!) {
+        foo: getFoo(foo: $foo)
+      }
+    `)
+
+    const fooQuery2 = parse(`
+      query FooQuery2($foo: String!) {
+        foo2: getFoo(foo: $foo)
+      }
+    `)
+
+    const { document, variables } = combinedQuery('test', {allow_duplicates: ['foo']})
+      .add(fooQuery, { foo: 'foo' })
+      .add(fooQuery2, { foo: 'foo'})
+    
+    expect(variables).deep.equal({
+      foo: 'foo',
+    })
+  })
+
   it('renaming works correctly if addN is used as the first operation', () => {
     const fooMutation = parse(`
       mutation FooQuery($foo: String!) {
