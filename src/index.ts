@@ -108,7 +108,7 @@ class CombinedQueryBuilderImpl<TData = any, TVariables = OperationVariables> imp
         kind: 'SelectionSet',
         selections: opDefs.flatMap(def => def.selectionSet.selections)
       },
-      variableDefinitions: opDefs.flatMap(def => def.variableDefinitions || [])
+      variableDefinitions: opDefs.flatMap(def => def.variableDefinitions || []).filter((value, index, array) => array.map(testValue => testValue?.variable?.name?.value).indexOf(value?.variable?.name?.value) === index)
     }]
     const encounteredFragmentList = new Set<string>()
     const combinedDocumentDefinitions = this.document.definitions.concat(document.definitions)
@@ -147,7 +147,7 @@ class CombinedQueryBuilderImpl<TData = any, TVariables = OperationVariables> imp
 
 export default function combinedQuery(operationName: string, config?: CombinedQueryBuilderConfig): NewCombinedQueryBuilder {
   let defaultConfig = config;
-  
+
   return {
     operationName,
     add<TData = any, TVariables extends OperationVariables={}>(document: DocumentNode, variables?: TVariables, config?: CombinedQueryBuilderConfig) {

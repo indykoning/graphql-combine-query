@@ -331,10 +331,15 @@ describe('combinedQuery', () => {
     const { document, variables } = combinedQuery('test', {allow_duplicates: ['foo']})
       .add(fooQuery, { foo: 'foo' })
       .add(fooQuery2, { foo: 'foo'})
-    
+
     expect(variables).deep.equal({
       foo: 'foo',
     })
+    expect(print(document)).equal(`query test($foo: String!) {
+  foo: getFoo(foo: $foo)
+  foo2: getFoo(foo: $foo)
+}
+`)
   })
 
   it('renaming works correctly if addN is used as the first operation', () => {
